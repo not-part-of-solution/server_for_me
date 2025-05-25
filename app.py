@@ -7,15 +7,20 @@ import gdown
 
 app = Flask(__name__)
 
-# Путь к вашей модели .h5
+# Путь к вашей модели
 MODEL_URL = 'https://drive.google.com/file/d/1ha9UT3lJgkJLwv1hOAp0HwBd76nXmapT/view?usp=drive_link'
 MODEL_PATH = 'cat_model.h5'
+
+# Скачивание модели, если её нет
+if not os.path.exists(MODEL_PATH):
+    file_id = '1ha9UT3lJgkJLwv1hOAp0HwBd76nXmapT'
+    gdown.download(f'https://drive.google.com/uc?id={file_id}', MODEL_PATH, quiet=False)
 
 # Параметры
 IMAGE_SIZE = (224, 224)
 UNKNOWN_THRESHOLD = 0.6
 
-# Метки классов (замените на свои)
+# Метки классов
 CLASS_LABELS = {
     0: 'unknown',
     1: 'Авель',
@@ -27,7 +32,7 @@ CLASS_LABELS = {
     7: 'Муся'
 }
 
-# Загрузка модели один раз при старте сервиса
+# Загрузка модели один раз при старте
 model = tf.keras.models.load_model(MODEL_PATH)
 
 def process_image(image_path):
@@ -62,5 +67,5 @@ def predict():
     return jsonify({'class': label, 'confidence': confidence})
 
 if __name__ == '__main__':
-   port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
