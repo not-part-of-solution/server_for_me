@@ -6,12 +6,13 @@ import os
 import gdown
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Ограничение файла 5MB
 
-# Путь к вашей модели
+# URL модели
 MODEL_URL = 'https://drive.google.com/file/d/1ha9UT3lJgkJLwv1hOAp0HwBd76nXmapT/view?usp=drive_link'
 MODEL_PATH = 'cat_model.h5'
 
-# Скачивание модели, если её нет
+# Скачивание модели, если нет
 if not os.path.exists(MODEL_PATH):
     file_id = '1ha9UT3lJgkJLwv1hOAp0HwBd76nXmapT'
     gdown.download(f'https://drive.google.com/uc?id={file_id}', MODEL_PATH, quiet=False)
@@ -20,7 +21,6 @@ if not os.path.exists(MODEL_PATH):
 IMAGE_SIZE = (224, 224)
 UNKNOWN_THRESHOLD = 0.6
 
-# Метки классов
 CLASS_LABELS = {
     0: 'unknown',
     1: 'Авель',
@@ -32,7 +32,7 @@ CLASS_LABELS = {
     7: 'Муся'
 }
 
-# Загрузка модели один раз при старте
+# Загрузка модели
 model = tf.keras.models.load_model(MODEL_PATH)
 
 def process_image(image_path):
@@ -44,7 +44,11 @@ def process_image(image_path):
     img = img / 255.0
     return np.expand_dims(img, axis=0)
 
-@app.route('/predict', methods=['POST'])
+@app.route("/", methods=["GET"])
+def index():
+    return "🟢 Flask сервер запущен. Используй POST /predict для распознавания изображения."
+
+@app.route("/predict", methods=["POST"])
 def predict():
     if 'image' not in request.files:
         return jsonify({'error': 'No image'}), 400
@@ -62,8 +66,8 @@ def predict():
     predictions = model.predict(processed_img)[0]
     class_id = int(np.argmax(predictions))
     confidence = float(predictions[class_id])
-
     label = CLASS_LABELS.get(class_id, 'unknown')
+
     return jsonify({'class': label, 'confidence': confidence})
 
 if __name__ == '__main__':
