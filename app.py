@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 import cv2
+from io import BytesIO
+from PIL import Image
 import numpy as np
 import tensorflow as tf
 import os
@@ -55,19 +57,24 @@ def predict():
         return jsonify({'error': 'No image'}), 400
 
     file = request.files['image']
-    temp_path = 'temp.jpg'
-    file.save(temp_path)
+    try:
+        image = Image.open(BytesIO(file.read())).convert("RGB")
+    except Exception:
+        return jsonify({'error': 'Invalid image format'}), 400
 
-    processed_img = process_image(temp_path)
-    os.remove(temp_path)
+    image = image.resize(IMAGE_SIZE)
+    image = np.array(image) / 255.0
+    image = np.expand_dims(image, axis=0)
 
-    if processed_img is None:
-        return jsonify({'error': 'Invalid image'}), 400
-
-    predictions = model.predict(processed_img)[0]
+    predictions = model.predict(image)[0]
     class_id = int(np.argmax(predictions))
     confidence = float(predictions[class_id])
     label = CLASS_LABELS.get(class_id, 'unknown')
+
+    # Чистим память
+    del image, predictions
+    import gc
+    gc.collect()
 
     return jsonify({'class': label, 'confidence': confidence})
 
