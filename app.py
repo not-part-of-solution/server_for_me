@@ -6,18 +6,18 @@ import os
 import gdown
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Ограничение файла 5MB
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Ограничение 5MB
 
-# URL модели
+# Ссылка на модель
 MODEL_URL = 'https://drive.google.com/file/d/1ha9UT3lJgkJLwv1hOAp0HwBd76nXmapT/view?usp=drive_link'
 MODEL_PATH = 'cat_model.h5'
 
-# Скачивание модели, если нет
+# Скачивание модели при первом запуске
 if not os.path.exists(MODEL_PATH):
     file_id = '1ha9UT3lJgkJLwv1hOAp0HwBd76nXmapT'
     gdown.download(f'https://drive.google.com/uc?id={file_id}', MODEL_PATH, quiet=False)
 
-# Параметры
+# Параметры модели
 IMAGE_SIZE = (224, 224)
 UNKNOWN_THRESHOLD = 0.6
 
@@ -30,7 +30,7 @@ CLASS_LABELS = {
     5: 'Ева',
     6: 'Изумруд',
     7: 'Муся',
-    8: 'Нора' 
+    8: 'Нора'
 }
 
 # Загрузка модели
@@ -47,29 +47,41 @@ def process_image(image_path):
 
 @app.route("/", methods=["GET"])
 def index():
-    return "Flask сервер запущен. Используй POST /predict для распознавания изображения."
+    return "Flask-сервер запущен. Используй POST /predict для распознавания изображения."
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if 'image' not in request.files:
-        return jsonify({'error': 'No image'}), 400
+        return jsonify({'error': 'No image file provided'}), 400
 
     file = request.files['image']
+    if file.filename == '':
+        return jsonify({'error': 'Empty filename'}), 400
+
     temp_path = 'temp.jpg'
-    file.save(temp_path)
+    try:
+        file.save(temp_path)
 
-    processed_img = process_image(temp_path)
-    os.remove(temp_path)
+        if not os.path.exists(temp_path):
+            return jsonify({'error': 'Failed to save image'}), 500
 
-    if processed_img is None:
-        return jsonify({'error': 'Invalid image'}), 400
+        processed_img = process_image(temp_path)
+        if processed_img is None:
+            return jsonify({'error': 'Invalid image file'}), 400
 
-    predictions = model.predict(processed_img)[0]
-    class_id = int(np.argmax(predictions))
-    confidence = float(predictions[class_id])
-    label = CLASS_LABELS.get(class_id, 'unknown')
+        predictions = model.predict(processed_img)[0]
+        class_id = int(np.argmax(predictions))
+        confidence = float(predictions[class_id])
+        label = CLASS_LABELS.get(class_id, 'unknown')
 
-    return jsonify({'class': label, 'confidence': confidence})
+        return jsonify({'class': label, 'confidence': confidence})
+
+    except Exception as e:
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
